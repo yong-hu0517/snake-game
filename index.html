@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>贪吃蛇大作战 v4.2.1</title>
+<title>贪吃蛇大作战 v4.3</title>
 <style>
   :root {
     --joy-size: 160px;
@@ -203,7 +203,6 @@
     font-size: 18px; color: #fff; font-weight: bold; pointer-events: none;
   }
   
-  /* 极速与精准按钮 */
   #boostBtn {
     position: absolute; top: var(--boost-y); left: var(--boost-x);
     width: var(--boost-size); height: calc(var(--boost-size) * 0.5);
@@ -282,7 +281,7 @@
 </div>
 
 <div id="startScreen" class="overlay">
-  <h1>🐍 贪吃蛇大作战 v4.2.1</h1>
+  <h1>🐍 贪吃蛇大作战 v4.3</h1>
   <p>双人同屏 + 技能系统 + 音乐播放列表 + 触屏手柄</p>
   <p style="color:#ffeb3b; font-size:13px;">💡 点击页面任意位置开始播放音乐</p>
 
@@ -431,7 +430,21 @@
 
 <div id="changelogScreen" class="overlay hidden">
   <h1 style="color:#ffeb3b;">📜 更新日志</h1>
-  <div class="changelogBox">v4.2.1 更新
+  <div class="changelogBox">v4.3 更新
+
+改了蛇的流线体。
+之前那个弹簧拉伸搞得像一串珠子。
+现在改回了从头粗到尾细的流线型。
+
+修复了Y键的狂暴无限触发问题。
+现在按一下只有一下，会进入冷却。
+
+今天喝了杯冰美式，感觉还行。
+下次试试生椰拿铁。
+
+━━━━━━━━━━━━━━
+
+v4.2.1 更新
 
 今天调这个虚拟按键的位置，调了半天。
 大拇指酸得不行，感觉要抽筋了。
@@ -1103,8 +1116,9 @@ class Snake {
     this.dashActiveTimer = 0;
     this.shieldCooldownTimer = 0;
     this.shieldActiveTimer = 0;
-    this.springOffset = 0;
-    this.lastSpeed = snakeBaseSpeed;
+    // ★ 修复Y键：添加狂暴冷却
+    this.yCooldownTimer = 0;
+    this.yActiveTimer = 0;
     this.reset(x, y);
   }
   tryDash() {
@@ -1132,9 +1146,9 @@ class Snake {
     this.dashActiveTimer = 0;
     this.shieldCooldownTimer = 0;
     this.shieldActiveTimer = 0;
+    this.yCooldownTimer = 0;
+    this.yActiveTimer = 0;
     this.speed = snakeBaseSpeed;
-    this.springOffset = 0;
-    this.lastSpeed = snakeBaseSpeed;
     this.path = [];
     for (let i = 0; i < 200; i++) {
       this.path.push({
@@ -1175,6 +1189,9 @@ class Snake {
     if (this.dashActiveTimer > 0) this.dashActiveTimer--;
     if (this.shieldCooldownTimer > 0) this.shieldCooldownTimer--;
     if (this.shieldActiveTimer > 0) this.shieldActiveTimer--;
+    // ★ 狂暴冷却与持续计时
+    if (this.yCooldownTimer > 0) this.yCooldownTimer--;
+    if (this.yActiveTimer > 0) this.yActiveTimer--;
 
     let targetAngle = this.angle;
     let speed = this.speed;
@@ -1217,15 +1234,24 @@ class Snake {
 
       if (this.playerIndex === 1 && touchDisk.active) {
         hasTouchInput = true;
-        if (touchDisk.sector === 'Y') {
-          speedMult = 2.2 * 3.0;
-        } else if (touchDisk.sector === 'A') {
+        if (touchDisk.sector === 'A') {
           speedMult = 2.2;
         } else if (touchDisk.sector === 'X') {
           if (this.dashActiveTimer <= 0) this.tryDash();
         } else if (touchDisk.sector === 'B') {
           if (this.shieldActiveTimer <= 0) this.tryShield();
+        } else if (touchDisk.sector === 'Y') {
+          // ★ 修复Y键：触发狂暴爆发，进入冷却
+          if (this.yCooldownTimer <= 0) {
+            this.yCooldownTimer = 300; // 5秒冷却
+            this.yActiveTimer = 30;    // 0.5秒爆发
+            if (this.dashActiveTimer <= 0) this.tryDash();
+          }
         }
+      }
+
+      if (this.yActiveTimer > 0) {
+        speedMult *= 2.2 * 1.5; // 狂暴效果：加速*冲刺
       }
 
       if (!hasTouchInput) {
@@ -1281,19 +1307,9 @@ class Snake {
 
     if (this.isPlayer && Math.random() < 0.5) spawnTrail(this.x, this.y, this.color);
 
-    const speedChange = speed - this.lastSpeed;
-    this.lastSpeed = speed;
-    if (Math.abs(speedChange) > 0.3) {
-      this.springOffset += speedChange * 0.5;
-    }
-    this.springOffset *= 0.88;
-    const maxOff = this.radius * 0.45;
-    this.springOffset = Math.max(-maxOff, Math.min(maxOff, this.springOffset));
-
+    // ★ 彻底移除弹簧系统，保证蛇身紧密流线体
     this.path.unshift({ x: this.x, y: this.y });
-
-    let spacing = this.radius * 1.0 + this.springOffset;
-    spacing = Math.max(this.radius * 0.55, Math.min(this.radius * 1.5, spacing));
+    const spacing = this.radius * 0.65; // 固定间距，足够小让圆重叠平滑
 
     const totalNeeded = spacing * (this.targetLength + 10);
     let acc = 0, cutIdx = this.path.length - 1;
@@ -1354,6 +1370,7 @@ class Snake {
     const total = this.points.length;
     for (let i = total - 1; i >= 0; i--) {
       const p = this.points[i];
+      // ★ 流线体粗细曲线，确保头部最粗，尾部最细
       const r = this.radius * (1 - i / (total + 10) * 0.5);
       let fillColor = this.color;
       if (this.skin === 'stripe') fillColor = i % 2 === 0 ? this.color : shadeColor(this.color, -50);
@@ -1888,7 +1905,6 @@ document.getElementById('speedSlider').addEventListener('input', (e) => {
   document.getElementById('speedVal').textContent = snakeBaseSpeed.toFixed(1);
   for (const s of snakes) s.speed = snakeBaseSpeed;
 });
-
 document.getElementById('musicVolumeSlider').addEventListener('input', (e) => {
   musicVolume = parseFloat(e.target.value);
   document.getElementById('musicVolumeVal').textContent = musicVolume.toFixed(1);
@@ -1938,7 +1954,6 @@ document.getElementById('preciseYSlider').addEventListener('input', (e) => {
   document.getElementById('preciseYVal').textContent = val;
 });
 
-// 恢复默认布局
 document.getElementById('resetLayoutBtn').addEventListener('click', () => {
   document.documentElement.style.setProperty('--joy-size', '160px');
   document.documentElement.style.setProperty('--disk-size', '180px');
