@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>贪吃蛇大作战 v4.4</title>
+<title>贪吃蛇大作战 v4.4.1</title>
 <style>
   :root {
     --joy-size: 160px;
@@ -56,7 +56,7 @@
   #pauseScreen {
     position: absolute; inset: 0; background: rgba(0,0,0,0.7);
     display: flex; flex-direction: column; align-items: center; justify-content: center;
-    color: #fff; z-index: 50;
+    color: #fff; z-index: 50; cursor: pointer;
   }
   #pauseScreen h1 { font-size: 60px; color: #ffeb3b; margin: 0 0 20px;
                     text-shadow: 0 0 30px rgba(255,235,59,0.5); }
@@ -258,10 +258,12 @@
   </div>
 </div>
 
-<div id="pauseScreen" class="hidden">
+<!-- ★ 修改点：点击屏幕恢复游戏 -->
+<div id="pauseScreen" class="hidden" onclick="togglePause()" ontouchstart="togglePause()">
   <h1>⏸ 已暂停</h1>
-  <p>键盘：按 <b>`</b>（Tab上方）或 <b>Esc</b> 继续</p>
-  <p>手柄：按 <b>Start</b>（三条线）继续</p>
+  <p>点击屏幕任意位置继续</p>
+  <p>键盘：按 <b>`</b> 或 <b>Esc</b> 继续</p>
+  <p>手柄：按 <b>Start</b> 继续</p>
 </div>
 
 <!-- ===== 虚拟触屏手柄 ===== -->
@@ -277,12 +279,11 @@
     <div id="pauseZone">||</div>
   </div>
   <div id="boostBtn">RT</div>
-  <!-- ★ 修改点：触屏端按钮文本改为 RT -->
   <div id="preciseBtn">RT</div>
 </div>
 
 <div id="startScreen" class="overlay">
-  <h1>🐍 贪吃蛇大作战 v4.4</h1>
+  <h1>🐍 贪吃蛇大作战 v4.4.1</h1>
   <p>双人同屏 + 技能系统 + 音乐播放列表 + 触屏手柄</p>
   <p style="color:#ffeb3b; font-size:13px;">💡 点击页面任意位置开始播放音乐</p>
 
@@ -431,7 +432,19 @@
 
 <div id="changelogScreen" class="overlay hidden">
   <h1 style="color:#ffeb3b;">📜 更新日志</h1>
-  <div class="changelogBox">v4.4 更新
+  <div class="changelogBox">v4.4.1 更新
+
+修了一个超级大坑。
+在平板上点暂停后，手机会卡死在里面。
+因为那个黑色的暂停遮罩把屏幕挡住了。
+
+现在改成点击屏幕任意位置都能继续。
+
+不说了，去改代码了。
+
+━━━━━━━━━━━━━━
+
+v4.4 更新
 
 这次调了蛇的形状。
 之前一段一段的像珠子。
@@ -1160,7 +1173,7 @@ class Snake {
     this.angle = this.isPlayer ? 0 : rand(0, Math.PI * 2);
     this.length = 1;
     this.targetLength = 8;
-    this.radius = this.baseRadius; // 重置半径
+    this.radius = this.baseRadius;
     this.alive = true;
     this.respawnTimer = 0;
     this.dashCooldownTimer = 0;
@@ -1178,7 +1191,6 @@ class Snake {
       });
     }
     this.points = [];
-    // 使用更小的间距，让身体看起来是连续的流线体
     const sp = this.radius * 0.3;
     for (let i = 0; i < this.targetLength; i++) {
       this.points.push({
@@ -1249,7 +1261,6 @@ class Snake {
 
       if (this.playerIndex === 1 && (touchBoost.active || touchPrecise.active)) {
         hasTouchInput = true;
-        // ★ 修改点：触屏端减速按钮改为0.5倍
         if (touchPrecise.active) speedMult = 0.5;
         else if (touchBoost.active) speedMult = 1.5;
       }
@@ -1278,7 +1289,7 @@ class Snake {
       if (!hasTouchInput) {
         const pad = this.playerIndex === 1 ? padState1 : padState2;
         const k = this.playerIndex === 1 ? keys1 : keys2;
-        if (pad.rb) speedMult = 0.3;  // 物理手柄依然保持0.3
+        if (pad.rb) speedMult = 0.3;
         else if (pad.rt > 0.05) speedMult = 0.3 + pad.rt * 1.2;
         if (pad.boost || k.boost) speedMult = 2.2;
       }
@@ -1329,7 +1340,6 @@ class Snake {
     if (this.isPlayer && Math.random() < 0.5) spawnTrail(this.x, this.y, this.color);
 
     this.path.unshift({ x: this.x, y: this.y });
-    // ★ 修改点：将间距调到极小，保证身体连成一条线
     const spacing = this.radius * 0.3;
 
     const totalNeeded = spacing * (this.targetLength + 10);
@@ -1371,7 +1381,6 @@ class Snake {
         foods.splice(fi, 1);
         this.length += 1;
         this.targetLength += 3;
-        // ★ 修改点：吃食物变胖，有上限
         this.radius = Math.min(this.baseRadius * 1.4, this.radius + 0.05);
         if (this.isPlayer) {
           if (this.playerIndex === 1) {
@@ -1393,7 +1402,6 @@ class Snake {
     const total = this.points.length;
     for (let i = total - 1; i >= 0; i--) {
       const p = this.points[i];
-      // ★ 修改点：调整粗细曲线，尾巴不尖
       const r = Math.max(this.radius * 0.4, this.radius * (1 - i / (total + 10) * 0.6));
       let fillColor = this.color;
       if (this.skin === 'stripe') fillColor = i % 2 === 0 ? this.color : shadeColor(this.color, -50);
